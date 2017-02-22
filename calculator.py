@@ -5,9 +5,9 @@ from datetime import timedelta
 
 class Calculator:
 
-  def __init__(self):
+  def __init__(self, currency_converter=CurrencyConverter(dict())):
     self.MONTO_FIJO = 975000
-    self.currency_converter = CurrencyConverter()
+    self.currency_converter = currency_converter
 
   def calculate(self, params):
     respuesta = ''
@@ -51,8 +51,8 @@ class Calculator:
   def can_calculate(self, params):
     date = params.fecha
     today = datetime.datetime.now()
-    tomorrow = (today + timedelta(days=1)).date()
-    if params.moneda == 'ARS' or date <= today.date():
+    tomorrow = today.date() + timedelta(days=1)
+    if params.moneda == 'ARS' or date <= tomorrow:
       return True
     else:
       return False

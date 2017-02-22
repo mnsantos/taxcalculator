@@ -20,7 +20,9 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
                           ConversationHandler, Job)
 
 import logging
+from currency_converter import CurrencyConverter
 from calculator import Calculator
+from state_saver import StateSaver
 from params import Params
 import datetime
 from datetime import timedelta
@@ -31,16 +33,18 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-calculator = Calculator()
-
 YES_NO_KEYBOARD = [['Si', 'No']]
 ESCRITURAS_KEYBOARD = [['Compraventa']]
 MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_IG, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_SELLO_TAX = range(9)
-data = dict()
-ids = []
+global data, ids, ratios, calculator, state_saver
+# ids = []
+# ratios = dict()
+
+# calculator = Calculator(CurrencyConverter(ratios))
+# state_saver = StateSaver()
 
 def alarm(bot, job):
   logger.info(job.context)
@@ -146,7 +150,7 @@ def check_sello_tax(bot, update, job_queue):
     update.message.reply_text(calculator_message(params))
   else:
     schedule_job(params, chat_id, job_queue)
-    update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(params.fecha) + "). Se le enviara un mensaje el dia " + str((params.fecha + timedelta(days=-1)).date()) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(id))
+    update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(params.fecha) + "). Se le enviara un mensaje el dia " + str(params.fecha + timedelta(days=-1)) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(params.id))
   return ConversationHandler.END
 
 def error(bot, update, error):
@@ -172,12 +176,16 @@ def calculator_message(params):
   except Exception as e:
     logger.error(e)
     return e.message
+  finally:
+    logger.info(ratios)
+    state_saver.save(data, ids, ratios)
 
 def schedule_job(params, chat_id, job_queue):
   today = datetime.datetime.now()
+  date = params.fecha
   currency_date = date.replace(day = date.day - 1)
   currency_date_dt = datetime.datetime(currency_date.year, currency_date.month, currency_date.day, 15, 30)
-  seconds = (currency_date - today).seconds
+  seconds = (currency_date_dt - today).seconds
   logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
   #seconds = 10
   id = generate_id()
@@ -185,10 +193,32 @@ def schedule_job(params, chat_id, job_queue):
   params.chat_id = chat_id
   job = Job(alarm, seconds, repeat=False, context=params)
   job_queue.put(job)
+  state_saver.save(data, ids, ratios)
+
 
 def main():
+  global data, ids, ratios, calculator, state_saver
+
   # Create the EventHandler and pass it your bot's token.
   updater = Updater("304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI")
+  state_saver = StateSaver()
+  try:
+    data, ids, ratios = state_saver.load()
+    logger.info("Loading ids " + str(ids))
+    logger.info("Loading data " + str(data))
+    logger.info("Loading ratios " + str(ratios))
+  except Exception as e:
+    ids = []
+    ratios = dict()
+    data = dict()
+    logger.info("Cannot load state from hard drive. Skipping...")
+
+  currency_converter = CurrencyConverter(ratios)
+  calculator = Calculator(currency_converter)
+  # ratios[datetime.date(2017, 2, 22)] = 15.7
+  # ratios[datetime.date(2017, 2, 21)] = 15.8
+  # ratios[datetime.date(2017, 2, 20)] = 15.9
+  # state_saver.save(data, ids, ratios)
 
   # Get the dispatcher to register handlers
   dp = updater.dispatcher
