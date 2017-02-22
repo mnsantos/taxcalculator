@@ -17,7 +17,7 @@ bot.
 
 from telegram import (ReplyKeyboardMarkup)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
-                          ConversationHandler)
+                          ConversationHandler, Job)
 
 import logging
 from calculator import Calculator
@@ -40,6 +40,11 @@ FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_IG, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_SELLO_TAX = range(9)
 data = dict()
+ids = []
+
+def alarm(bot, job):
+    logger.info(job.context)
+    bot.sendMessage(job.context.chat_id, text='Pedido ' + str(job.context[id]) + ':\n' + calculator.calculate(job.context))
 
 def calcular(bot, update):
     chat_id = update.message.chat_id
@@ -74,10 +79,17 @@ def check_fecha(bot, update):
         date = (today + timedelta(days=1)).date()
     else:
         date = datetime.datetime.strptime(answer, '%d%m%Y').date()
-    if date < today.date():
-        "La fecha debe ser igual o posterior al dia de hoy"
-    data[chat_id].fecha = date
+    if data[chat_id].moneda != 'ARS':
+        if date < today.date():
+            update.message.reply_text("La fecha debe ser igual o posterior al dia de hoy. Por favor reingrese la fecha (FORMATO: ddmmyyyy. Ejemplo: 24102017)", reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
+            return CHECK_FECHA
+        elif date == today.date():
+            if today.hour > 15:
+                update.message.reply_text("Ya pasaron las 15hs del dia de hoy. Por favor ingrese otra fecha (FORMATO: ddmmyyyy. Ejemplo: 24102017)", reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
+                return CHECK_FECHA
     update.message.reply_text('¿Precio?')
+    data[chat_id].fecha = date
+    
     return CHECK_PRECIO
 
 def check_tipo_escritura(bot, update):
@@ -127,13 +139,31 @@ def check_propiedad(bot, update):
     update.message.reply_text('Ingrese el precio mayor entre VIR y VF')
     return CHECK_SELLO_TAX
 
-def check_sello_tax(bot, update):
+def check_sello_tax(bot, update, job_queue):
     logger.info("check sello tax")
     chat_id = update.message.chat_id
     answer = update.message.text
     data[chat_id].sello_tax = float(answer)
     logger.info(data)
-    update.message.reply_text(calculator.calculate(data[chat_id]))
+    date = data[chat_id].fecha
+    today = datetime.datetime.now()
+    tomorrow = (today + timedelta(days=1)).date()
+    if data[chat_id].moneda != 'ARS':
+        if date == today.date() or (date == tomorrow and today.hour > 15):
+            update.message.reply_text(calculator.calculate(data[chat_id]))
+        else:
+            d = date.replace(day = date.day - 1)
+            dt = datetime.datetime(d.year, d.month, d.day, 15, 30)
+            seconds = (dt - today).seconds
+            logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
+            #seconds = 10
+            id = generate_id()
+            data[chat_id].id = id
+            data[chat_id].chat_id = chat_id
+            update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(date) + "). Se le enviara un mensaje el dia " + str(d) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(id))
+            params = data[chat_id]
+            job = Job(alarm, seconds, repeat=False, context=params)
+            job_queue.put(job)
     return ConversationHandler.END
 
 def error(bot, update, error):
@@ -144,6 +174,14 @@ def cancel(bot, update):
     logger.info("User %s canceled the conversation." % user.first_name)
     update.message.reply_text('Chau!')
     return ConversationHandler.END
+
+def generate_id():
+    if not ids:
+        id = 1
+    else:
+        id = max(ids) + 1
+    ids.append(id)
+    return id
 
 
 def main():
@@ -165,7 +203,7 @@ def main():
             CHECK_REEMPLAZO: [RegexHandler('^(Si|No)$', check_reemplazo)],
             CHECK_GANANCIAS: [RegexHandler('^(Si|No)$', check_ganancias)],
             CHECK_PROPIEDAD: [RegexHandler('^(Si|No)$', check_propiedad)],
-            CHECK_SELLO_TAX: [MessageHandler(Filters.text, check_sello_tax)]
+            CHECK_SELLO_TAX: [MessageHandler(Filters.text, check_sello_tax, pass_job_queue=True)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]

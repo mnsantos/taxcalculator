@@ -15,7 +15,7 @@ class Calculator:
 			res = self.currency_converter.convert_to_ars(params.precio)
 			ratio = res[1]
 			precio_pesos = res[0]
-			respuesta = respuesta + 'Cotizacion utilizada: ' + str(ratio) + ' (' + str(params.fecha) + '). Monto en pesos: $' + str(precio_pesos) +'\n'
+			respuesta = respuesta + 'Cotizacion utilizada: ' + str(ratio) + '. Monto en pesos: $' + str(precio_pesos) +'\n'
 		else:
 			precio_pesos = params.precio
 		if params.iti:

@@ -11,6 +11,8 @@ class Params:
 		self.fecha = ''
 		self.tipo = ''
 		self.sello_tax = 0
+		self.id = 0
+		self.chat_id = 0
 
 	def __repr__(self):
 		return 'ig: ' + str(self.ig) + \
@@ -22,4 +24,6 @@ class Params:
 		', precio: ' + str(self.precio) + \
 		', fecha: ' + str(self.fecha) + \
 		', VIR/VF: ' + str(self.sello_tax) + \
-		', tipo: ' + str(self.tipo)
+		', tipo: ' + str(self.tipo) + \
+		', id: ' + str(self.id) + \
+		', chat_id: ' + str(self.chat_id)
