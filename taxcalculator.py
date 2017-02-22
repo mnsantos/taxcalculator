@@ -44,7 +44,9 @@ ids = []
 
 def alarm(bot, job):
     logger.info(job.context)
-    bot.sendMessage(job.context.chat_id, text='Pedido ' + str(job.context[id]) + ':\n' + calculator.calculate(job.context))
+    id = job.context[id]
+    ids.remove(id)
+    bot.sendMessage(job.context.chat_id, text='Pedido ' + str(id) + ':\n' + calculator.calculate(job.context))
 
 def calcular(bot, update):
     chat_id = update.message.chat_id
@@ -148,22 +150,21 @@ def check_sello_tax(bot, update, job_queue):
     date = data[chat_id].fecha
     today = datetime.datetime.now()
     tomorrow = (today + timedelta(days=1)).date()
-    if data[chat_id].moneda != 'ARS':
-        if date == today.date() or (date == tomorrow and today.hour > 15):
-            update.message.reply_text(calculator.calculate(data[chat_id]))
-        else:
-            d = date.replace(day = date.day - 1)
-            dt = datetime.datetime(d.year, d.month, d.day, 15, 30)
-            seconds = (dt - today).seconds
-            logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
-            #seconds = 10
-            id = generate_id()
-            data[chat_id].id = id
-            data[chat_id].chat_id = chat_id
-            update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(date) + "). Se le enviara un mensaje el dia " + str(d) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(id))
-            params = data[chat_id]
-            job = Job(alarm, seconds, repeat=False, context=params)
-            job_queue.put(job)
+    if data[chat_id].moneda == 'ARS' or date == today.date() or (date == tomorrow and today.hour > 15):
+        update.message.reply_text(calculator.calculate(data[chat_id]))
+    else:
+        d = date.replace(day = date.day - 1)
+        dt = datetime.datetime(d.year, d.month, d.day, 15, 30)
+        seconds = (dt - today).seconds
+        logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
+        #seconds = 10
+        id = generate_id()
+        data[chat_id].id = id
+        data[chat_id].chat_id = chat_id
+        update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(date) + "). Se le enviara un mensaje el dia " + str(d) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(id))
+        params = data[chat_id]
+        job = Job(alarm, seconds, repeat=False, context=params)
+        job_queue.put(job)
     return ConversationHandler.END
 
 def error(bot, update, error):
