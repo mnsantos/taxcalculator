@@ -12,7 +12,7 @@ class Calculator:
 		precio_vf_vir = params.sello_tax
 		precio_pesos = 0
 		if (params.moneda == 'USD'):
-			res = self.currency_converter.convert_to_ars(params.precio)
+			res = self.currency_converter.convert_to_ars(params.precio, (params.fecha + timedelta(days=-1)).date())
 			ratio = res[1]
 			precio_pesos = res[0]
 			respuesta = respuesta + 'Cotizacion utilizada: ' + str(ratio) + '. Monto en pesos: $' + str(precio_pesos) +'\n'

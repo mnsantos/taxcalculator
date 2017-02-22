@@ -81,14 +81,6 @@ def check_fecha(bot, update):
         date = (today + timedelta(days=1)).date()
     else:
         date = datetime.datetime.strptime(answer, '%d%m%Y').date()
-    if data[chat_id].moneda != 'ARS':
-        if date < today.date():
-            update.message.reply_text("La fecha debe ser igual o posterior al dia de hoy. Por favor reingrese la fecha (FORMATO: ddmmyyyy. Ejemplo: 24102017)", reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
-            return CHECK_FECHA
-        elif date == today.date():
-            if today.hour > 15:
-                update.message.reply_text("Ya pasaron las 15hs del dia de hoy. Por favor ingrese otra fecha (FORMATO: ddmmyyyy. Ejemplo: 24102017)", reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
-                return CHECK_FECHA
     update.message.reply_text('¿Precio?')
     data[chat_id].fecha = date
     
