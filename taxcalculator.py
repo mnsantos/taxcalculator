@@ -49,6 +49,12 @@ def calcular(bot, update):
   update.message.reply_text('Hola, ¿tipo de escritura?', reply_markup=ReplyKeyboardMarkup(ESCRITURAS_KEYBOARD, one_time_keyboard=True))
   return CHECK_TIPO_ESCRITURA
 
+def pedidos(bot, update):
+  chat_id = update.message.chat_id
+  user_jobs = [job for job in jobs if job.chat_id == chat_id]
+  message = ', '.join(['Pedido ' + str(job.id) for job in user_jobs])
+  update.message.reply_text(message)
+
 def check_tipo_escritura(bot, update):
   logger.info("check_tipo_escritura")
   chat_id = update.message.chat_id
@@ -262,6 +268,7 @@ def main():
   )
 
   dp.add_handler(conv_handler)
+  dp.add_handler(CommandHandler("pedidos", pedidos))
 
   # log all errors
   dp.add_error_handler(error)
