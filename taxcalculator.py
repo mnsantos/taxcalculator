@@ -40,7 +40,7 @@ MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_VIR, CHECK_VF = range(9)
-global data, ids, ratios, jobs, calculator, state_saver, currency_converter
+global data, ids, ratios, jobs, calculator, state_saver, currency_converter, bot
 sched = BackgroundScheduler()
 
 def calcular(bot, update):
@@ -137,7 +137,7 @@ def check_vf(bot, update):
   update.message.reply_text('Ingrese VIR')
   return CHECK_VIR
 
-def check_vir(bot, update, job_queue):
+def check_vir(bot, update):
   logger.info("check vir")
   chat_id = update.message.chat_id
   answer = update.message.text
@@ -147,7 +147,7 @@ def check_vir(bot, update, job_queue):
   if calculator.can_calculate(params):
     update.message.reply_text(calculator_message(params))
   else:
-    schedule_job(params, chat_id, job_queue)
+    schedule_job(params, chat_id)
     update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(params.fecha) + "). Se le enviara un mensaje el dia " + str(params.fecha + timedelta(days=-1)) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(params.id))
   return ConversationHandler.END
 
@@ -168,12 +168,6 @@ def generate_id():
   ids.append(id)
   return id
 
-def alarm(bot, job):
-  logger.info(job.context)
-  id = job.context.id
-  ids.remove(id)
-  bot.sendMessage(job.context.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(params))
-
 def calculator_message(params):
   try:
     return calculator.calculate(params)
@@ -184,7 +178,7 @@ def calculator_message(params):
     logger.info(ratios)
     save()
 
-def schedule_job(params, chat_id, job_queue):
+def schedule_job(params, chat_id):
   #today = datetime.datetime.now()
   #date = params.fecha
   #currency_date = date.replace(day = date.day - 1)
@@ -208,8 +202,11 @@ def scheduled_currency():
   today = datetime.datetime.now().date()
   tomorrow = today + timedelta(days=1)
   executable_jobs = [job for job in jobs if job.fecha == tomorrow]
-  non_executable_jobs = [job for job in jobs if job not in executable_jobs]
-  jobs = non_executable_jobs
+  for job in executable_jobs:
+    id = job.id
+    ids.remove(id)
+    jobs.remove(job)
+    bot.sendMessage(job.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(job))
   save()
 
 def save(): 
@@ -220,11 +217,12 @@ def save():
   state_saver.save(data, ids, ratios, jobs)
 
 def main():
-  global data, ids, ratios, calculator, jobs, state_saver, currency_converter
+  global data, ids, ratios, calculator, jobs, state_saver, currency_converter, bot
 
   sched.start()
   # Create the EventHandler and pass it your bot's token.
   updater = Updater("304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI")
+  bot = updater.bot
   state_saver = StateSaver()
   try:
     data, ids, ratios, jobs = state_saver.load()
@@ -261,7 +259,7 @@ def main():
       CHECK_GANANCIAS: [RegexHandler('^(Si|No)$', check_ganancias)],
       CHECK_PROPIEDAD: [RegexHandler('^(Si|No)$', check_propiedad)],
       CHECK_VF: [MessageHandler(Filters.text, check_vf)],
-      CHECK_VIR: [MessageHandler(Filters.text, check_vir, pass_job_queue=True)]
+      CHECK_VIR: [MessageHandler(Filters.text, check_vir)]
     },
 
     fallbacks=[CommandHandler('cancel', cancel)]
