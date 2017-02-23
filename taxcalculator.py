@@ -38,19 +38,8 @@ ESCRITURAS_KEYBOARD = [['Compraventa']]
 MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
-CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_IG, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_SELLO_TAX = range(9)
+CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_VIR, CHECK_VF = range(9)
 global data, ids, ratios, calculator, state_saver
-# ids = []
-# ratios = dict()
-
-# calculator = Calculator(CurrencyConverter(ratios))
-# state_saver = StateSaver()
-
-def alarm(bot, job):
-  logger.info(job.context)
-  id = job.context.id
-  ids.remove(id)
-  bot.sendMessage(job.context.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(params))
 
 def calcular(bot, update):
   chat_id = update.message.chat_id
@@ -58,21 +47,17 @@ def calcular(bot, update):
   update.message.reply_text('Hola, ¿tipo de escritura?', reply_markup=ReplyKeyboardMarkup(ESCRITURAS_KEYBOARD, one_time_keyboard=True))
   return CHECK_TIPO_ESCRITURA
 
-def check_moneda(bot, update):
-  logger.info("check_moneda")
+def check_tipo_escritura(bot, update):
+  logger.info("check_tipo_escritura")
   chat_id = update.message.chat_id
   answer = update.message.text
-  data[chat_id].moneda = answer
-  update.message.reply_text('¿El vendedor paga IG?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
-  return CHECK_IG
-
-def check_precio(bot, update):
-  logger.info("check_precio")
-  chat_id = update.message.chat_id
-  answer = update.message.text
-  data[chat_id].precio = float(answer)
-  update.message.reply_text('¿En que moneda se encuentra?', reply_markup=ReplyKeyboardMarkup(MONEDAS_KEYBOARD, one_time_keyboard=True))
-  return CHECK_MONEDA
+  data[chat_id].tipo = answer
+  if answer == 'Compraventa':
+    update.message.reply_text('Ingrese la fecha de la escritura (FORMATO: ddmmyyyy. Ejemplo: 24102017) o seleccione alguna opcion si corresponde', reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
+    return CHECK_FECHA
+  else:
+    update.message.reply_text('Tipo de escritura no reconocido. Por favor ingrese el tipo de escritura nuevamente.', reply_markup=ReplyKeyboardMarkup(ESCRITURAS_KEYBOARD, one_time_keyboard=True))
+    return CHECK_TIPO_ESCRITURA
 
 def check_fecha(bot, update):
   logger.info("check_fecha")
@@ -89,26 +74,30 @@ def check_fecha(bot, update):
   data[chat_id].fecha = date
   return CHECK_PRECIO
 
-def check_tipo_escritura(bot, update):
-  logger.info("check_tipo_escritura")
+def check_precio(bot, update):
+  logger.info("check_precio")
   chat_id = update.message.chat_id
   answer = update.message.text
-  data[chat_id].tipo = answer
-  if answer == 'Compraventa':
-    update.message.reply_text('Ingrese la fecha de la escritura (FORMATO: ddmmyyyy. Ejemplo: 24102017) o seleccione alguna opcion si corresponde', reply_markup=ReplyKeyboardMarkup(FECHAS_KEYBOARD, one_time_keyboard=True))
-    return CHECK_FECHA
-  else:
-    update.message.reply_text('Tipo de escritura no reconocido. Por favor ingrese el tipo de escritura nuevamente.', reply_markup=ReplyKeyboardMarkup(ESCRITURAS_KEYBOARD, one_time_keyboard=True))
-    return CHECK_TIPO_ESCRITURA
+  data[chat_id].precio = float(answer)
+  update.message.reply_text('¿En que moneda se encuentra?', reply_markup=ReplyKeyboardMarkup(MONEDAS_KEYBOARD, one_time_keyboard=True))
+  return CHECK_MONEDA
 
-def check_ig(bot, update):
+def check_moneda(bot, update):
+  logger.info("check_moneda")
+  chat_id = update.message.chat_id
+  answer = update.message.text
+  data[chat_id].moneda = answer
+  update.message.reply_text('¿El vendedor paga IG?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
+  return CHECK_GANANCIAS
+
+def check_ganancias(bot, update):
   logger.info("check_ig")
   chat_id = update.message.chat_id
   answer = update.message.text
   if answer == 'Si':
-    data[chat_id].ig = True
-    update.message.reply_text('¿IG paga ganancias?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
-    return CHECK_GANANCIAS
+    data[chat_id].ganancias = True
+    update.message.reply_text('¿El comprador tiene otra propiedad en CABA?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
+    return CHECK_PROPIEDAD
   else:
     data[chat_id].iti = True
     update.message.reply_text('¿Tiene certificado de no retencion de ITI?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
@@ -123,27 +112,28 @@ def check_reemplazo(bot, update):
   update.message.reply_text('¿El comprador tiene otra propiedad en CABA?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
   return CHECK_PROPIEDAD
 
-def check_ganancias(bot, update):
-  chat_id = update.message.chat_id
-  answer = update.message.text
-  if answer == 'Si':
-    data[chat_id].ganancias = True
-  update.message.reply_text('¿El comprador tiene otra propiedad en CABA?', reply_markup=ReplyKeyboardMarkup(YES_NO_KEYBOARD, one_time_keyboard=True))
-  return CHECK_PROPIEDAD
-
 def check_propiedad(bot, update):
+  logger.info("check_propiedad")
   chat_id = update.message.chat_id
   answer = update.message.text
   if answer == 'Si':
-    data[chat_id].otraPropiedad = True
-  update.message.reply_text('Ingrese el precio mayor entre VIR y VF')
-  return CHECK_SELLO_TAX
+    data[chat_id].otra_propiedad = True
+  update.message.reply_text('Ingrese VF')
+  return CHECK_VF
 
-def check_sello_tax(bot, update, job_queue):
-  logger.info("check sello tax")
+def check_vf(bot, update):
+  logger.info("check vf")
   chat_id = update.message.chat_id
   answer = update.message.text
-  data[chat_id].sello_tax = float(answer)
+  data[chat_id].vf = float(answer)
+  update.message.reply_text('Ingrese VIR')
+  return CHECK_VIR
+
+def check_vir(bot, update, job_queue):
+  logger.info("check vir")
+  chat_id = update.message.chat_id
+  answer = update.message.text
+  data[chat_id].vir = float(answer)
   params = data[chat_id]
   logger.info(data)
   if calculator.can_calculate(params):
@@ -169,6 +159,12 @@ def generate_id():
     id = max(ids) + 1
   ids.append(id)
   return id
+
+def alarm(bot, job):
+  logger.info(job.context)
+  id = job.context.id
+  ids.remove(id)
+  bot.sendMessage(job.context.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(params))
 
 def calculator_message(params):
   try:
@@ -231,11 +227,11 @@ def main():
       CHECK_FECHA: [MessageHandler(Filters.text, check_fecha)],
       CHECK_MONEDA: [RegexHandler('^(ARS|USD)$', check_moneda)],
       CHECK_PRECIO: [MessageHandler(Filters.text, check_precio)],
-      CHECK_IG: [RegexHandler('^(Si|No)$', check_ig)],
       CHECK_REEMPLAZO: [RegexHandler('^(Si|No)$', check_reemplazo)],
       CHECK_GANANCIAS: [RegexHandler('^(Si|No)$', check_ganancias)],
       CHECK_PROPIEDAD: [RegexHandler('^(Si|No)$', check_propiedad)],
-      CHECK_SELLO_TAX: [MessageHandler(Filters.text, check_sello_tax, pass_job_queue=True)]
+      CHECK_VF: [MessageHandler(Filters.text, check_vf)],
+      CHECK_VIR: [MessageHandler(Filters.text, check_vir, pass_job_queue=True)]
     },
 
     fallbacks=[CommandHandler('cancel', cancel)]
