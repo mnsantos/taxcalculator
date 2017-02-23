@@ -241,7 +241,7 @@ def main():
 
   currency_converter = CurrencyConverter(ratios)
   calculator = Calculator(currency_converter)
-  # ratios[datetime.date(2017, 2, 22)] = 15.7
+  ratios[datetime.date(2017, 2, 22)] = 15.7
   # ratios[datetime.date(2017, 2, 21)] = 15.8
   # ratios[datetime.date(2017, 2, 20)] = 15.9
   # state_saver.save(data, ids, ratios)
