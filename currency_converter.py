@@ -18,15 +18,18 @@ class CurrencyConverter:
     if date in self.ratios:
       ratio = self.ratios[date]
     else:
-      if date < today.date():
-        raise Exception("No se encuentra cotizacion para " + str(date))
+      if date > today.date():
+        raise Exception("No es posible obtener la cotizacion de la fecha futura " + str(date))
       elif date == today.date():
         ratio = self.ratio_usd_to_ars()
         self.ratios[date] = ratio
+      else:
+        raise Exception("No es posible obtener la cotizacion de la fecha " + str(date))
     return [(amount * ratio), ratio]
 
   def ratio_usd_to_ars(self):
     logging.info("Buscando cotizacion en la pagina del banco nacion...")
     response = urllib2.urlopen(self.url)
     soup = BeautifulSoup(response, 'html.parser', from_encoding="utf-8")
-    return float(soup.find("table", class_ = 'table cotizacion').find('td', class_ = 'tit').parent.findChildren()[-1].text.replace(",","."))
+    ratio = float(soup.find("table", class_ = 'table cotizacion').find('td', class_ = 'tit').parent.findChildren()[-1].text.replace(",","."))
+    return ratio

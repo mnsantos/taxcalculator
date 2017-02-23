@@ -24,6 +24,7 @@ from currency_converter import CurrencyConverter
 from calculator import Calculator
 from state_saver import StateSaver
 from params import Params
+from apscheduler.schedulers.background import BackgroundScheduler
 import datetime
 from datetime import timedelta
 
@@ -39,7 +40,8 @@ MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_VIR, CHECK_VF = range(9)
-global data, ids, ratios, calculator, state_saver
+global data, ids, ratios, calculator, state_saver, currency_converter
+sched = BackgroundScheduler()
 
 def calcular(bot, update):
   chat_id = update.message.chat_id
@@ -174,6 +176,9 @@ def calculator_message(params):
     return e.message
   finally:
     logger.info(ratios)
+    logger.info("Guardando ids " + str(ids))
+    logger.info("Guardando data " + str(data))
+    logger.info("Guardando ratios " + str(ratios))
     state_saver.save(data, ids, ratios)
 
 def schedule_job(params, chat_id, job_queue):
@@ -189,20 +194,33 @@ def schedule_job(params, chat_id, job_queue):
   params.chat_id = chat_id
   job = Job(alarm, seconds, repeat=False, context=params)
   job_queue.put(job)
+  logger.info("Guardando ids " + str(ids))
+  logger.info("Guardando data " + str(data))
+  logger.info("Guardando ratios " + str(ratios))
   state_saver.save(data, ids, ratios)
 
+@sched.scheduled_job('cron', hour=15, minute= 25)
+def scheduled_currency():
+  today = datetime.datetime.now().date()
+  logger.info('Guardando cortizacion del dia ' + str(today))
+  currency_converter.convert_to_ars(1, today)
+  logger.info("Guardando ids " + str(ids))
+  logger.info("Guardando data " + str(data))
+  logger.info("Guardando ratios " + str(ratios))
+  state_saver.save(data, ids, ratios)
 
 def main():
-  global data, ids, ratios, calculator, state_saver
+  global data, ids, ratios, calculator, state_saver, currency_converter
 
+  sched.start()
   # Create the EventHandler and pass it your bot's token.
   updater = Updater("304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI")
   state_saver = StateSaver()
   try:
     data, ids, ratios = state_saver.load()
-    logger.info("Loading ids " + str(ids))
-    logger.info("Loading data " + str(data))
-    logger.info("Loading ratios " + str(ratios))
+    logger.info("Cargando ids " + str(ids))
+    logger.info("Cargando data " + str(data))
+    logger.info("Cargando ratios " + str(ratios))
   except Exception as e:
     ids = []
     ratios = dict()
