@@ -40,7 +40,7 @@ MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_VIR, CHECK_VF = range(9)
-global data, ids, ratios, calculator, state_saver, currency_converter
+global data, ids, ratios, jobs, calculator, state_saver, currency_converter
 sched = BackgroundScheduler()
 
 def calcular(bot, update):
@@ -176,38 +176,42 @@ def calculator_message(params):
     return e.message
   finally:
     logger.info(ratios)
-    logger.info("Guardando ids " + str(ids))
-    logger.info("Guardando data " + str(data))
-    logger.info("Guardando ratios " + str(ratios))
-    state_saver.save(data, ids, ratios)
+    save()
 
 def schedule_job(params, chat_id, job_queue):
-  today = datetime.datetime.now()
-  date = params.fecha
-  currency_date = date.replace(day = date.day - 1)
-  currency_date_dt = datetime.datetime(currency_date.year, currency_date.month, currency_date.day, 15, 30)
-  seconds = (currency_date_dt - today).seconds
-  logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
+  #today = datetime.datetime.now()
+  #date = params.fecha
+  #currency_date = date.replace(day = date.day - 1)
+  #currency_date_dt = datetime.datetime(currency_date.year, currency_date.month, currency_date.day, 15, 30)
+  #seconds = (currency_date_dt - today).seconds
+  #logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
   #seconds = 10
-  id = generate_id()
-  params.id = id
+  params.id = generate_id()
   params.chat_id = chat_id
-  job = Job(alarm, seconds, repeat=False, context=params)
-  job_queue.put(job)
-  logger.info("Guardando ids " + str(ids))
-  logger.info("Guardando data " + str(data))
-  logger.info("Guardando ratios " + str(ratios))
-  state_saver.save(data, ids, ratios)
+  #job = Job(alarm, seconds, repeat=False, context=params)
+  #job_queue.put(job)
+  jobs.append(params)
+  save()
 
-@sched.scheduled_job('cron', hour=15, minute= 25)
+@sched.scheduled_job('cron', hour=15, minute= 30)
 def scheduled_currency():
+  global jobs
   today = datetime.datetime.now().date()
   logger.info('Guardando cortizacion del dia ' + str(today))
   currency_converter.convert_to_ars(1, today)
+  today = datetime.datetime.now().date()
+  tomorrow = today + timedelta(days=1)
+  executable_jobs = [job for job in jobs if job.fecha == tomorrow]
+  non_executable_jobs = [job for job in jobs if job not in executable_jobs]
+  jobs = non_executable_jobs
+  save()
+
+def save(): 
   logger.info("Guardando ids " + str(ids))
   logger.info("Guardando data " + str(data))
   logger.info("Guardando ratios " + str(ratios))
-  state_saver.save(data, ids, ratios)
+  logger.info("Guardando jobs " + str(jobs))
+  state_saver.save(data, ids, ratios, jobs)
 
 def main():
   global data, ids, ratios, calculator, state_saver, currency_converter
@@ -217,10 +221,11 @@ def main():
   updater = Updater("304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI")
   state_saver = StateSaver()
   try:
-    data, ids, ratios = state_saver.load()
+    data, ids, ratios, jobs = state_saver.load()
     logger.info("Cargando ids " + str(ids))
     logger.info("Cargando data " + str(data))
     logger.info("Cargando ratios " + str(ratios))
+    logger.info("Cargando jobs " + str(jobs))
   except Exception as e:
     ids = []
     ratios = dict()
