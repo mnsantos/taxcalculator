@@ -52,7 +52,10 @@ def calcular(bot, update):
 def pedidos(bot, update):
   chat_id = update.message.chat_id
   user_jobs = [job for job in jobs if job.chat_id == chat_id]
-  message = ', '.join(['Pedido ' + str(job.id) for job in user_jobs])
+  if not user_jobs:
+    message = 'No tiene pedidos encolados.'
+  else:
+    message = ', '.join(['Pedido ' + str(job.id) for job in user_jobs])
   update.message.reply_text(message)
 
 def check_tipo_escritura(bot, update):
@@ -179,17 +182,8 @@ def calculator_message(params):
     save()
 
 def schedule_job(params, chat_id):
-  #today = datetime.datetime.now()
-  #date = params.fecha
-  #currency_date = date.replace(day = date.day - 1)
-  #currency_date_dt = datetime.datetime(currency_date.year, currency_date.month, currency_date.day, 15, 30)
-  #seconds = (currency_date_dt - today).seconds
-  #logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
-  #seconds = 10
   params.id = generate_id()
   params.chat_id = chat_id
-  #job = Job(alarm, seconds, repeat=False, context=params)
-  #job_queue.put(job)
   jobs.append(params)
   save()
 
