@@ -214,7 +214,7 @@ def save():
   state_saver.save(data, ids, ratios, jobs)
 
 def main():
-  global data, ids, ratios, calculator, state_saver, currency_converter
+  global data, ids, ratios, calculator, jobs, state_saver, currency_converter
 
   sched.start()
   # Create the EventHandler and pass it your bot's token.
@@ -230,6 +230,7 @@ def main():
     ids = []
     ratios = dict()
     data = dict()
+    jobs = []
     logger.info("Cannot load state from hard drive. Skipping...")
 
   currency_converter = CurrencyConverter(ratios)
