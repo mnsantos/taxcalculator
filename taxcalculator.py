@@ -26,6 +26,7 @@ from state_saver import StateSaver
 from params import Params
 from apscheduler.schedulers.background import BackgroundScheduler
 import datetime
+import os
 from datetime import timedelta
 
 # Enable logging
@@ -214,7 +215,8 @@ def main():
 
   sched.start()
   # Create the EventHandler and pass it your bot's token.
-  updater = Updater("304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI")
+  TOKEN = "304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI"
+  updater = Updater(TOKEN)
   state_saver = StateSaver()
   try:
     data, ids, ratios = state_saver.load()
@@ -261,7 +263,14 @@ def main():
   dp.add_error_handler(error)
 
   # Start the Bot
-  updater.start_polling()
+  # updater.start_polling()
+  PORT = int(os.environ.get('PORT', '5000'))
+
+  updater.start_webhook(listen="0.0.0.0",
+                      port=PORT,
+                      url_path=TOKEN)
+  updater.bot.setWebhook("https://bookfinder1301.herokuapp.com/" + TOKEN)
+  updater.idle()
 
   # Run the bot until the you presses Ctrl-C or the process receives SIGINT,
   # SIGTERM or SIGABRT. This should be used most of the time, since
