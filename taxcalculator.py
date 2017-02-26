@@ -41,7 +41,7 @@ MONEDAS_KEYBOARD = [['ARS', 'USD']]
 FECHAS_KEYBOARD = [['Hoy', 'Mañana']]
 
 CHECK_MONEDA, CHECK_PRECIO, CHECK_FECHA, CHECK_TIPO_ESCRITURA, CHECK_REEMPLAZO, CHECK_GANANCIAS, CHECK_PROPIEDAD, CHECK_VIR, CHECK_VF = range(9)
-global data, ids, ratios, calculator, state_saver, currency_converter
+global data, ids, ratios, jobs, calculator, state_saver, currency_converter, bot
 sched = BackgroundScheduler()
 
 def calcular(bot, update):
@@ -49,6 +49,15 @@ def calcular(bot, update):
   data[chat_id] = Params()
   update.message.reply_text('Hola, ¿tipo de escritura?', reply_markup=ReplyKeyboardMarkup(ESCRITURAS_KEYBOARD, one_time_keyboard=True))
   return CHECK_TIPO_ESCRITURA
+
+def pedidos(bot, update):
+  chat_id = update.message.chat_id
+  user_jobs = [job for job in jobs if job.chat_id == chat_id]
+  if not user_jobs:
+    message = 'No tiene pedidos encolados.'
+  else:
+    message = ', '.join(['Pedido ' + str(job.id) for job in user_jobs])
+  update.message.reply_text(message)
 
 def check_tipo_escritura(bot, update):
   logger.info("check_tipo_escritura")
@@ -132,7 +141,7 @@ def check_vf(bot, update):
   update.message.reply_text('Ingrese VIR')
   return CHECK_VIR
 
-def check_vir(bot, update, job_queue):
+def check_vir(bot, update):
   logger.info("check vir")
   chat_id = update.message.chat_id
   answer = update.message.text
@@ -142,7 +151,7 @@ def check_vir(bot, update, job_queue):
   if calculator.can_calculate(params):
     update.message.reply_text(calculator_message(params))
   else:
-    schedule_job(params, chat_id, job_queue)
+    schedule_job(params, chat_id)
     update.message.reply_text("Su pedido no puede ser procesado en este momento ya que la fecha que ingreso es futura (" + str(params.fecha) + "). Se le enviara un mensaje el dia " + str(params.fecha + timedelta(days=-1)) + " a las 15:30hs con el pedido solicitado. Numero de referencia: " + str(params.id))
   return ConversationHandler.END
 
@@ -163,12 +172,6 @@ def generate_id():
   ids.append(id)
   return id
 
-def alarm(bot, job):
-  logger.info(job.context)
-  id = job.context.id
-  ids.remove(id)
-  bot.sendMessage(job.context.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(params))
-
 def calculator_message(params):
   try:
     return calculator.calculate(params)
@@ -177,61 +180,63 @@ def calculator_message(params):
     return e.message
   finally:
     logger.info(ratios)
-    logger.info("Guardando ids " + str(ids))
-    logger.info("Guardando data " + str(data))
-    logger.info("Guardando ratios " + str(ratios))
-    state_saver.save(data, ids, ratios)
+    save()
 
-def schedule_job(params, chat_id, job_queue):
-  today = datetime.datetime.now()
-  date = params.fecha
-  currency_date = date.replace(day = date.day - 1)
-  currency_date_dt = datetime.datetime(currency_date.year, currency_date.month, currency_date.day, 15, 30)
-  seconds = (currency_date_dt - today).seconds
-  logger.info("Programando pedido para dentro de " + str(seconds) + " segundos.")
-  #seconds = 10
-  id = generate_id()
-  params.id = id
+def schedule_job(params, chat_id):
+  params.id = generate_id()
   params.chat_id = chat_id
-  job = Job(alarm, seconds, repeat=False, context=params)
-  job_queue.put(job)
-  logger.info("Guardando ids " + str(ids))
-  logger.info("Guardando data " + str(data))
-  logger.info("Guardando ratios " + str(ratios))
-  state_saver.save(data, ids, ratios)
+  jobs.append(params)
+  save()
 
-@sched.scheduled_job('cron', hour=15, minute= 25)
+@sched.scheduled_job('cron', hour=15, minute= 30)
 def scheduled_currency():
+  global jobs
   today = datetime.datetime.now().date()
   logger.info('Guardando cortizacion del dia ' + str(today))
   currency_converter.convert_to_ars(1, today)
+  today = datetime.datetime.now().date()
+  tomorrow = today + timedelta(days=1)
+  executable_jobs = [job for job in jobs if job.fecha == tomorrow]
+  for job in executable_jobs:
+    id = job.id
+    ids.remove(id)
+    jobs.remove(job)
+    bot.sendMessage(job.chat_id, text='Pedido ' + str(id) + ':\n' + calculator_message(job))
+  save()
+
+def save(): 
   logger.info("Guardando ids " + str(ids))
   logger.info("Guardando data " + str(data))
   logger.info("Guardando ratios " + str(ratios))
-  state_saver.save(data, ids, ratios)
+  logger.info("Guardando jobs " + str(jobs))
+  state_saver.save(data, ids, ratios, jobs)
 
 def main():
-  global data, ids, ratios, calculator, state_saver, currency_converter
+  global data, ids, ratios, calculator, jobs, state_saver, currency_converter, bot
 
   sched.start()
   # Create the EventHandler and pass it your bot's token.
   TOKEN = "304421327:AAF6V6IJh3q60COrgapidTtmiQx5eNl79WI"
   updater = Updater(TOKEN)
+  bot = updater.bot
+
   state_saver = StateSaver()
   try:
-    data, ids, ratios = state_saver.load()
+    data, ids, ratios, jobs = state_saver.load()
     logger.info("Cargando ids " + str(ids))
     logger.info("Cargando data " + str(data))
     logger.info("Cargando ratios " + str(ratios))
+    logger.info("Cargando jobs " + str(jobs))
   except Exception as e:
     ids = []
     ratios = dict()
     data = dict()
+    jobs = []
     logger.info("Cannot load state from hard drive. Skipping...")
 
   currency_converter = CurrencyConverter(ratios)
   calculator = Calculator(currency_converter)
-  # ratios[datetime.date(2017, 2, 22)] = 15.7
+  ratios[datetime.date(2017, 2, 22)] = 15.7
   # ratios[datetime.date(2017, 2, 21)] = 15.8
   # ratios[datetime.date(2017, 2, 20)] = 15.9
   # state_saver.save(data, ids, ratios)
@@ -251,13 +256,14 @@ def main():
       CHECK_GANANCIAS: [RegexHandler('^(Si|No)$', check_ganancias)],
       CHECK_PROPIEDAD: [RegexHandler('^(Si|No)$', check_propiedad)],
       CHECK_VF: [MessageHandler(Filters.text, check_vf)],
-      CHECK_VIR: [MessageHandler(Filters.text, check_vir, pass_job_queue=True)]
+      CHECK_VIR: [MessageHandler(Filters.text, check_vir)]
     },
 
     fallbacks=[CommandHandler('cancel', cancel)]
   )
 
   dp.add_handler(conv_handler)
+  dp.add_handler(CommandHandler("pedidos", pedidos))
 
   # log all errors
   dp.add_error_handler(error)

@@ -15,7 +15,7 @@ class Params:
     self.chat_id = 0
 
   def __repr__(self):
-    return ', iti: ' + str(self.iti) + \
+    return 'iti: ' + str(self.iti) + \
     ', reemplazo: ' + str(self.reemplazo) + \
     ', otra_propiedad: ' + str(self.otra_propiedad) + \
     ', ganancias: ' + str(self.ganancias) + \
