@@ -275,7 +275,7 @@ def main():
   updater.start_webhook(listen="0.0.0.0",
                       port=PORT,
                       url_path=TOKEN)
-  updater.bot.setWebhook("https://bookfinder1301.herokuapp.com/" + TOKEN)
+  updater.bot.setWebhook("https://taxcalculatorbot.herokuapp.com/" + TOKEN)
   updater.idle()
 
   # Run the bot until the you presses Ctrl-C or the process receives SIGINT,
