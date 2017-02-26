@@ -1,1 +1,1 @@
-worker: python taxcalculator.py
+web: python taxcalculator.py
