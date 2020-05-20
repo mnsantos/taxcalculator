@@ -1,6 +1,6 @@
 APScheduler==3.3.1
 BeautifulSoup==3.2.1
 beautifulsoup4==4.5.1
-httplib2==0.9.1
+httplib2==0.18.0
 python-telegram-bot==5.2.0
 urllib3==1.19.1
